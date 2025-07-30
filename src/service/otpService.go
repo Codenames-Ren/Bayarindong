@@ -172,3 +172,7 @@ func (s *otpService) verifyOTPByEmail(email, purpose, inputCode string) (bool, e
 
 	return false, errors.New("invalid or expired otp")
 }
+
+func (s *otpService) DeleteOTP(userID, purpose string) error {
+	return s.DB.Where("user_id = ? AND purpose = ?", userID, purpose).Delete(&models.OTP{}).Error
+}
