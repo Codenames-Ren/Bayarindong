@@ -132,3 +132,43 @@ func (s *otpService) CreateOTP(email string, purpose string) (*models.OTP, error
 	return tempOTP, nil
 }
 
+func (s *otpService) verifyOTPByEmail(email, purpose, inputCode string) (bool, error) {
+
+	//search user by email
+	var user models.User
+	if err := s.DB.Where("email = ?", email).First(&user).Error; err != nil {
+		return false, errors.New("user not found")
+	}
+
+	var otps []models.OTP
+	err := s.DB.Where("user_id = ? AND purpose = ?", user.ID, purpose).Order("created_at DESC").Find(&otps).Error;
+	if err != nil {
+		return false, err
+	}
+
+	if len(otps) == 0 {
+		return false, errors.New("no OTP found")
+	}
+
+	for _, otp := range otps {
+		if otp.Used {
+			continue
+		}
+
+		if time.Since(otp.CreatedAt) > time.Minute * 5 {
+			continue
+		}
+
+		if verifyOTP(inputCode, otp.Code) {
+			otp.Used = true
+			s.DB.Save(&otp)
+
+			user.Status = "active"
+			s.DB.Save(&user)
+
+			return true, nil
+		}
+	}
+
+	return false, errors.New("invalid or expired otp")
+}
